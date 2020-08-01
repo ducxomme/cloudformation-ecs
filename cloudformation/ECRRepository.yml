@@ -1,0 +1,34 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Create ECR Stack Test
+Parameters:
+  repositoryName:
+    Type: String
+    Default: httpd-web
+  LifecyclePolicyText:
+    Type: String
+    Default: |
+      {
+        "rules": [
+          {
+            "rulePriority": 1,
+            "description": "Delete image untagged after 5 days",
+            "selection": {
+              "tagStatus": "untagged",
+              "countUnit": "days",
+              "countType": "sinceImagePushed",
+              "countNumber": 5
+            },
+            "action": {
+              "type": "expire"
+            }
+          }
+        ]
+      }
+
+Resources:
+  ECRRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Ref repositoryName
+      LifecyclePolicy:
+        LifecyclePolicyText: !Ref LifecyclePolicyText
