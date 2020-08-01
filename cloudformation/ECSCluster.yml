@@ -30,7 +30,7 @@ Resources:
       Protocol: HTTP
       VpcId: vpc-08647060
       TargetType: ip
-      HealthCheckPath: '/index.html'
+      HealthCheckPath: '/var/www/html/index.html'
       HealthCheckIntervalSeconds: 10
       HealthCheckProtocol: HTTP
       HealthCheckTimeoutSeconds: 5

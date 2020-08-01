@@ -14,7 +14,7 @@ docker-push:
 	docker push 445386517627.dkr.ecr.us-east-2.amazonaws.com/httpd-web:v1
 
 createEcs:
-	aws cloudformation create-stack \
+	aws cloudformation update-stack \
 	--stack-name ecs-cluster \
 	--template-body file://cloudformation/ECSCluster.yml \
 	--region us-east-2
