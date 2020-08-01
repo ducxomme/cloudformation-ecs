@@ -10,6 +10,12 @@ createEcr:
 docker-login:
 	aws --region us-east-2 ecr get-login-password | docker login --username AWS --password-stdin 445386517627.dkr.ecr.us-east-2.amazonaws.com
 
+docker-build:
+	docker build -t 445386517627.dkr.ecr.us-east-2.amazonaws.com/httpd-web:v1 .
+	
+docker-tag:
+	docker tag httpd-centos:v1 445386517627.dkr.ecr.us-east-2.amazonaws.com/httpd-web:v1
+
 docker-push:
 	docker push 445386517627.dkr.ecr.us-east-2.amazonaws.com/httpd-web:v1
 
