@@ -4,7 +4,7 @@ createEcr:
 	--stack-name ecr-repository-httpd \
 	--template-body file://cloudformation/ECRRepository.yml \
 	--parameter \
-	ParameterKey=repositoryName,ParameterValue=httpd-web \
+	ParameterKey=repositoryName,ParameterValue=application \
 	--region us-east-2
 
 docker-login:
@@ -20,9 +20,15 @@ docker-push:
 	docker push 445386517627.dkr.ecr.us-east-2.amazonaws.com/httpd-web:v1
 
 createEcs:
-	aws cloudformation update-stack \
+	aws cloudformation create-stack \
 	--stack-name ecs-cluster \
 	--template-body file://cloudformation/ECSCluster.yml \
+	--region us-east-2
+
+createVPC:
+	aws cloudformation create-stack \
+	--stack-name dev-httpd-vpc \
+	--template-body file://cloudformation/VPC.yml \
 	--region us-east-2
 
 createService:

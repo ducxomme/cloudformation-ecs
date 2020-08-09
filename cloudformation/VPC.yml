@@ -1,0 +1,213 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  VPC Network
+
+Parameters:
+  StageName:
+    Description: An stage name that will be prefixed to resource names
+    Type: String
+    Default: dev
+  
+  ApplicationName:
+    Type: String
+    Default: httpd
+  
+  VPCCIDR:
+    Type: String
+    Default: '192.168.48.0/20'
+  PublicSubnetCIDRs:
+    Type: CommaDelimitedList
+    Default: '192.168.48.0/24,192.168.49.0/24'
+  PrivateSubnetCIDRs:
+    Type: CommaDelimitedList
+    Default: '192.168.50.0/24,192.168.51.0/24'
+  
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      InstanceTenancy: default
+      Tags:
+      - Key: Name
+        Value: !Sub "${StageName}-${ApplicationName}-VPC"
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: Name
+        Value: !Sub "${StageName}-${ApplicationName}-IGW"
+  
+  IGAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  # ROUTE TABLE
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    DependsOn: IGAttachment
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: !Sub "${StageName}-${ApplicationName}-PublicRouteTable"
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: !Sub "${StageName}-${ApplicationName}-PrivateRouteTable"
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: IGAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref InternetGateway
+
+  # SUBNET
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [0, !GetAZs {Ref: 'AWS::Region'}]
+      CidrBlock: !Select [0, !Ref PublicSubnetCIDRs]
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: !Sub "${StageName}-${ApplicationName}-PublicSubnet1"
+  PublicSubnet1RouteTableAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+  
+  
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [1, !GetAZs {Ref: 'AWS::Region'}]
+      CidrBlock: !Select [1, !Ref PublicSubnetCIDRs]
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: !Sub "${StageName}-${ApplicationName}-PublicSubnet2"
+  PublicSubnet2RouteTableAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+  
+  
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [0, !GetAZs {Ref: 'AWS::Region'}]
+      CidrBlock: !Select [0, !Ref PrivateSubnetCIDRs]
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: !Sub "${StageName}-${ApplicationName}-PrivateSubnet1"
+  PrivateSubnet1RouteTableAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [1, !GetAZs {Ref: 'AWS::Region'}]
+      CidrBlock: !Select [1, !Ref PrivateSubnetCIDRs]
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: !Sub "${StageName}-${ApplicationName}-PrivateSubnet2"
+  PrivateSubnet2RouteTableAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateRouteTable
+
+  LoadBalancerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Group for LoadBalancer
+      GroupName: !Sub "${StageName}-${ApplicationName}-ALB-SG"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - CidrIp: '0.0.0.0/0'
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+  
+  ApplicationSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Group for Application
+      GroupName: !Sub "${StageName}-${ApplicationName}-Application-SG"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - SourceSecurityGroupId: !Ref LoadBalancerSG
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          Description: 'From ALB'
+
+
+Outputs:
+  VPC:
+    Value: !Ref VPC
+    Export:
+      Name: !Sub "${StageName}-${ApplicationName}-VPC"
+  
+  PublicSubnet1:
+    Value: !Ref PublicSubnet1
+    Export:
+      Name: !Sub "${StageName}-${ApplicationName}-PublicSubnet1"
+  
+  PublicSubnet2:
+    Value: !Ref PublicSubnet2
+    Export:
+      Name: !Sub "${StageName}-${ApplicationName}-PublicSubnet2"
+
+  PrivateSubnet1:
+    Value: !Ref PrivateSubnet1
+    Export:
+      Name: !Sub "${StageName}-${ApplicationName}-PrivateSubnet1"
+
+  PrivateSubnet2:
+    Value: !Ref PrivateSubnet2
+    Export:
+      Name: !Sub "${StageName}-${ApplicationName}-PrivateSubnet2"
+
+  InternetGateway: 
+    Value: !Ref InternetGateway
+    Export:
+      Name: !Sub "${StageName}-${ApplicationName}-IGW"
+
+  PublicRouteTable:
+    Value: !Ref PublicRouteTable
+    Export:
+      Name: !Sub "${StageName}-${ApplicationName}-PublicRouteTable"
+
+  PrivateRouteTable:
+    Value: !Ref PrivateRouteTable
+    Export:
+      Name: !Sub "${StageName}-${ApplicationName}-PrivateRouteTable"
+  
+  LoadBalancerSG:
+    Value: !Ref LoadBalancerSG
+    Export:
+      Name: !Sub "${StageName}-${ApplicationName}-ALB-SG"
+  
+  ApplicationSG:
+    Value: !Ref ApplicationSG
+    Export:
+      Name: !Sub "${StageName}-${ApplicationName}-Application-SG"

@@ -4,7 +4,7 @@ Description: Create ECS Task
 Parameters:
   StageName:
     Type: String
-    Default: ecs-dev
+    Default: dev
   ApplicationName:
     Type: String
     Default: httpd
@@ -16,47 +16,28 @@ Resources:
     Properties:
       ClusterName: !Sub ${StageName}-${ApplicationName}-ecs-cluster
   
-  ECSLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub '/ecs/${StageName}-${ApplicationName}-template'
-      RetentionInDays: 3
-  
-  TargetGroup:
-    Type: AWS::ElasticLoadBalancingV2::TargetGroup
-    Properties:
-      Name: !Sub ${StageName}-${ApplicationName}-TG
-      Port: 80
-      Protocol: HTTP
-      VpcId: vpc-08647060
-      TargetType: ip
-      HealthCheckPath: '/var/www/html/index.html'
-      HealthCheckIntervalSeconds: 10
-      HealthCheckProtocol: HTTP
-      HealthCheckTimeoutSeconds: 5
-      HealthyThresholdCount: 2
-      UnhealthyThresholdCount: 2
-  
   LoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
       Name: !Sub ${StageName}-${ApplicationName}-ALB
       Subnets:
-        - "subnet-9e211df6"
-        - "subnet-87b2d8fd"
-        - "subnet-839a47cf"
+        - {"Fn::ImportValue": !Sub "${StageName}-${ApplicationName}-PublicSubnet1"}
+        - {"Fn::ImportValue": !Sub "${StageName}-${ApplicationName}-PublicSubnet2"}
       SecurityGroups:
-        - "sg-0739f294e8aa8da02"
+        - {"Fn::ImportValue": !Sub "${StageName}-${ApplicationName}-ALB-SG"}
 
-  ALBListener:
-    Type: AWS::ElasticLoadBalancingV2::Listener
-    Properties:
-      LoadBalancerArn: !Ref LoadBalancer
-      Port: 80
-      Protocol: HTTP
-      DefaultActions:
-      - Type: forward
-        TargetGroupArn: !Ref TargetGroup
+  # ALBListener:
+  #   Type: AWS::ElasticLoadBalancingV2::Listener
+  #   Properties:
+  #     LoadBalancerArn: !Ref LoadBalancer
+  #     Port: 80
+  #     Protocol: HTTP
+  #     DefaultActions:
+  #     - Type: fixed-response
+  #       FixedResponseConfig:
+  #         ContentType: 'text/plain'
+  #         StatusCode: '404'
+  #         MessageBody: 'NotFound'
 
 
 Outputs:
@@ -65,23 +46,13 @@ Outputs:
     Value: !Ref ECSCluster
     Export:
       Name: !Sub ${StageName}-${ApplicationName}-ecs-cluster
-  ECSLogGroup:
-    Description: A reference of ECS Log group
-    Value: !Ref ECSLogGroup
-    Export:
-      Name: !Sub ${StageName}-${ApplicationName}-ecs-log-group
-  TargetGroup:
-    Description: A reference of Target Group
-    Value: !Ref TargetGroup
-    Export:
-      Name: !Sub ${StageName}-${ApplicationName}-TG
   LoadBalancer:
     Description: A reference of LoadBalancer
     Value: !Ref LoadBalancer
     Export:
       Name: !Sub ${StageName}-${ApplicationName}-ALB
-  ALBListener:
-    Description: A reference of ALBListener
-    Value: !Ref ALBListener
-    Export:
-      Name: !Sub ${StageName}-${ApplicationName}-ALB-Listener
+  # ALBListener:
+  #   Description: A reference of ALBListener
+  #   Value: !Ref ALBListener
+  #   Export:
+  #     Name: !Sub ${StageName}-${ApplicationName}-ALB-Listener

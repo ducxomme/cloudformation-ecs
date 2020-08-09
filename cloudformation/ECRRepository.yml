@@ -3,7 +3,7 @@ Description: Create ECR Stack Test
 Parameters:
   repositoryName:
     Type: String
-    Default: httpd-web
+    Default: application
   LifecyclePolicyText:
     Type: String
     Default: |

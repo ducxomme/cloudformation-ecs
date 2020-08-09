@@ -4,16 +4,16 @@ Description: Create ECS Service
 Parameters:
   StageName:
     Type: String
-    Default: ecs-dev
+    Default: dev
   ApplicationName:
     Type: String
     Default: httpd
   ApplicationImage:
     Type: String
-    Default: 445386517627.dkr.ecr.us-east-2.amazonaws.com/httpd-web
+    Default: 445386517627.dkr.ecr.us-east-2.amazonaws.com/application
   AppImageTag:
     Type: String
-    Default: v1
+    Default: v2
 
 
 
@@ -46,18 +46,43 @@ Resources:
       ContainerDefinitions:
         - Name: !Sub ${StageName}-container
           Image: !Sub ${ApplicationImage}:${AppImageTag}
-          # LogConfiguration:
-          #   LogDriver: awslogs
-          #   Options:
-          #     awslogs-group: {"Fn::ImportValue": !Sub "${StageName}-${ApplicationName}-ecs-log-group"}
-          #     awslogs-region: !Ref "AWS::Region"
-          #     awslogs-stream-prefix: "ecs-test"
           MemoryReservation: 128
           PortMappings:
             - HostPort: 80
               Protocol: tcp
               ContainerPort: 80
-    
+
+  ECSLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/ecs/${StageName}-${ApplicationName}-template'
+      RetentionInDays: 3  
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub ${StageName}-${ApplicationName}-TG
+      Port: 80
+      Protocol: HTTP
+      VpcId: {"Fn::ImportValue": !Sub "${StageName}-${ApplicationName}-VPC"}
+      TargetType: ip
+      HealthCheckPath: '/var/www/html/index.html'
+      HealthCheckIntervalSeconds: 10
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+  
+  LoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: {"Fn::ImportValue": !Sub "${StageName}-${ApplicationName}-ALB"}
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+
   ECSService:
     Type: AWS::ECS::Service
     Properties:
@@ -67,17 +92,15 @@ Resources:
       TaskDefinition: !Ref ECSTaskDefinition
       LaunchType: FARGATE
       LoadBalancers:
-        - TargetGroupArn: {"Fn::ImportValue": !Sub "${StageName}-${ApplicationName}-TG"}
+        - TargetGroupArn: !Ref TargetGroup
           ContainerPort: 80
           ContainerName: !Sub ${StageName}-container
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: ENABLED
           SecurityGroups:
-            - "sg-0739f294e8aa8da02"
+            - {"Fn::ImportValue": !Sub "${StageName}-${ApplicationName}-Application-SG"}
           Subnets:
-            - "subnet-9e211df6"
-            - "subnet-87b2d8fd"
-            - "subnet-839a47cf"
+            - {"Fn::ImportValue": !Sub "${StageName}-${ApplicationName}-PublicSubnet1"}
 
 
