@@ -1,0 +1,108 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  StageName:
+    Description: An stage name that will be prefixed to resource names
+    Type: String
+    Default: dev
+  ApplicationName:
+    Type: String
+    Default: wordpress
+  KeyName:
+    Description: EC2 SSH KEY
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: volume
+  
+  InstanceType:
+    Type: String
+    AllowedValues:
+    - t2.nano
+    - t2.micro
+    - t2.small
+    - t2.medium
+    - m3.medium
+    - m4.large
+    - c3.medium
+    - c4.medium
+    - c4.large
+    Default: t2.small
+  Ec2ImageId:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+
+Resources:
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub ${StageName}-${ApplicationName}-TG
+      Port: 80
+      Protocol: HTTP
+      VpcId: {"Fn::ImportValue": !Sub "${StageName}-${ApplicationName}-VPC"}
+      TargetType: instance
+      HealthCheckPath: '/var/www/html/index.html'
+      HealthCheckIntervalSeconds: 10
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+
+  LoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub ${StageName}-${ApplicationName}-ALB
+      Subnets:
+        - {"Fn::ImportValue": !Sub "${StageName}-${ApplicationName}-PublicSubnet1"}
+        - {"Fn::ImportValue": !Sub "${StageName}-${ApplicationName}-PublicSubnet2"}
+      SecurityGroups:
+        - {"Fn::ImportValue": !Sub "${StageName}-${ApplicationName}-ALB-SG"}
+
+        
+  LaunchConfiguration:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      KeyName: !Ref KeyName
+      AssociatePublicIpAddress: 'true'
+      SecurityGroups: 
+        - {"Fn::ImportValue": !Sub "${StageName}-${ApplicationName}-Application-SG"}
+      InstanceType: !Ref InstanceType
+      # ImageId: !FindInMap [ RegionMap, !Ref "AWS::Region", EBS ]
+      ImageId: !Ref Ec2ImageId
+      LaunchConfigurationName: !Sub "${StageName}-${ApplicationName}-LaunchConfig"
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install -y httpd
+          systemctl start httpd.service
+          systemctl enable httpd.service
+          cd /var/www/html
+          echo "<html><h1>Hello</h1></html>" > index.html
+          chkconfig httpd on
+      BlockDeviceMappings:
+        - DeviceName: "/dev/xvda"
+          Ebs:
+            VolumeSize: "8"
+            VolumeType: "gp2"
+
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    DependsOn: LoadBalancer
+    Properties:
+      LaunchConfigurationName: !Ref LaunchConfiguration
+      MinSize: "2"
+      MaxSize: "2"
+      DesiredCapacity: "2"
+      VPCZoneIdentifier:
+        - {"Fn::ImportValue": !Sub "${StageName}-${ApplicationName}-PublicSubnet1"}
+        - {"Fn::ImportValue": !Sub "${StageName}-${ApplicationName}-PublicSubnet2"}
+      TargetGroupARNs: 
+        - !Ref TargetGroup
+        

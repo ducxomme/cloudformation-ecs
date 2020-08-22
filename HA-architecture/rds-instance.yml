@@ -1,0 +1,122 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description:
+  RDS Aurora MySQL5.7
+
+Parameters:
+  StageName:
+    Type: String
+    Default: dev
+    AllowedValues:
+    - dev
+    - prod
+  ApplicationName:
+    Type: String
+    Default: wordpress
+  AuroraDBInstanceClassParameter:
+    Type: String
+    Description: "RDS Instance Class"
+    Default: db.t2.small
+  AuroraEngineVersionParameter:
+    Type: String
+    Description: "Aurora MySQL Engine Version"
+    Default: 5.7.12
+  AuroraMasterUsernameParameter:
+    Type: String
+  AuroraMasterUserPasswordParameter:
+    Type: String
+    NoEcho: True
+
+  AuroraBackupRetentionPeriodParameter:
+    Type: Number
+    Default: 21
+    Description: "DB snapshot retention period"
+  AuroraPreferredBackupWindowParameter:
+    Type: String
+    Default: "15:45-16:15"
+    Description: "UTC when backup snapshot is taken"
+    ConstraintDescription: "Must be hh24:mi-hh34:mi format, at least 30 minutes, and not conflict with the preferred maintenance window"
+  AuroraPreferredMaintenanceWindowParameter:
+    Type: String
+    Default: "Sat:14:20-Sat:14:50"
+    Description: "UTC when system maintenance can occur"
+    ConstraintDescription: "Must be ddd:hh24:mi-ddd:hh24:mi, at least 30 minutes, Valid Days: Mon, Tue, Wed, Thu, Fri, Sat, Sun"
+
+
+Resources:
+
+  RDSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: {"Fn::ImportValue": !Sub "${StageName}-${ApplicationName}-VPC"}
+      GroupDescription: SecurityGroup for RDS
+      SecurityGroupIngress:
+        - CidrIp: '192.168.48.0/20'
+          IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          Description: From same VPC network
+      Tags:
+        - Key: Name
+          Value: !Sub "${StageName}-${ApplicationName}-rds-sg"
+
+  AuroraSubnetGroup:
+    Type: "AWS::RDS::DBSubnetGroup"
+    Properties:
+      DBSubnetGroupDescription: !Sub "subnet group for ${StageName}-${ApplicationName} RDS"
+      SubnetIds:
+        - Fn::ImportValue: !Sub "${StageName}-${ApplicationName}-PrivateSubnet1"
+        - Fn::ImportValue: !Sub "${StageName}-${ApplicationName}-PrivateSubnet2"
+
+  AuroraCluster:
+    Type: "AWS::RDS::DBCluster"
+    DeletionPolicy: Delete
+    Properties:
+      DBClusterIdentifier: !Sub "${StageName}-${ApplicationName}-cluster-db"
+      BackupRetentionPeriod: !Ref AuroraBackupRetentionPeriodParameter
+      DBClusterParameterGroupName: {"Fn::ImportValue": !Sub "${StageName}-${ApplicationName}-AuroraDBClusterParameterGroup"}
+      DBSubnetGroupName: !Ref AuroraSubnetGroup
+      Engine: "aurora-mysql"
+      EngineVersion: !Ref AuroraEngineVersionParameter
+      MasterUsername: !Ref AuroraMasterUsernameParameter
+      MasterUserPassword: !Ref AuroraMasterUserPasswordParameter
+      Port: 3306
+      PreferredBackupWindow: !Ref AuroraPreferredBackupWindowParameter
+      PreferredMaintenanceWindow: !Ref AuroraPreferredMaintenanceWindowParameter
+      StorageEncrypted: True
+      VpcSecurityGroupIds:
+        - !Ref RDSSecurityGroup
+      EnableCloudwatchLogsExports:
+        - "error"
+        - "slowquery"
+        - "audit"
+
+  AuroraInstance:
+    Type: "AWS::RDS::DBInstance"
+    DeletionPolicy: Delete
+    Properties:
+      AutoMinorVersionUpgrade: True
+      CopyTagsToSnapshot: No
+      DBClusterIdentifier: !Ref AuroraCluster
+      DBInstanceClass: !Ref AuroraDBInstanceClassParameter
+      DBInstanceIdentifier: !Sub "${StageName}-${ApplicationName}-db"
+      DBParameterGroupName: {"Fn::ImportValue": !Sub "${StageName}-${ApplicationName}-AuroraDBParameterGroup"}
+      DBSubnetGroupName: !Ref AuroraSubnetGroup
+      Engine: "aurora-mysql"
+      EngineVersion: !Ref AuroraEngineVersionParameter
+      MultiAZ: False # VPC Multi-AZ DB Instances are not available for engine: aurora
+      PubliclyAccessible: False
+      StorageEncrypted: True
+
+Outputs:
+  AuroraSubnetGroup:
+    Value: !Ref AuroraSubnetGroup
+    Export:
+      Name: !Sub "${StageName}-${ApplicationName}-AuroraSubnetGroup"
+  AuroraCluster:
+    Value: !Ref AuroraCluster
+    Export:
+      Name: !Sub "${StageName}-${ApplicationName}-AuroraCluster"
+  AuroraInstance:
+    Value: !Ref AuroraInstance
+    Export:
+      Name: !Sub "${StageName}-${ApplicationName}-AuroraInstance"

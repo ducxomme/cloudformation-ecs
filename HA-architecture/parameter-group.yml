@@ -1,0 +1,49 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description:
+  RDS Aurora MySQL5.7 Parameter Group
+
+Parameters:
+  StageName:
+    Type: String
+    Default: dev
+    AllowedValues:
+    - dev
+    - prod
+  ApplicationName: 
+    Type: String
+    Default: wordpress
+
+Resources:
+  AuroraDBClusterParameterGroup:
+    Type: "AWS::RDS::DBClusterParameterGroup"
+    Properties:
+      Description: !Sub "cluster parameter group for ${StageName}-${ApplicationName}-cluster-db"
+      Family: "aurora-mysql5.7"
+      Parameters:
+        "character_set_database": "utf8"
+        "character_set_server": "utf8"
+        "innodb_ft_min_token_size": 1
+        "server_audit_logging": 1
+        "server_audit_events": "CONNECT, QUERY, QUERY_DCL, QUERY_DDL, QUERY_DML, TABLE"
+
+  AuroraDBParameterGroup:
+    Type: "AWS::RDS::DBParameterGroup"
+    Properties:
+      Description: !Sub "parameter group for ${StageName}-${ApplicationName}-db"
+      Family: "aurora-mysql5.7"
+      Parameters:
+        "init_connect": "SET SESSION time_zone = CASE WHEN POSITION('rds' IN CURRENT_USER()) = 1 THEN 'UTC' ELSE 'Asia/Tokyo' END;"
+        "slow_query_log": 1
+        "long_query_time": 1
+        "log_output": FILE
+        "log_warnings": 1
+
+Outputs:
+  AuroraDBClusterParameterGroup:
+    Value: !Ref AuroraDBClusterParameterGroup
+    Export:
+      Name: !Sub "${StageName}-${ApplicationName}-AuroraDBClusterParameterGroup"
+  AuroraDBParameterGroup:
+    Value: !Ref AuroraDBParameterGroup
+    Export:
+      Name: !Sub "${StageName}-${ApplicationName}-AuroraDBParameterGroup"

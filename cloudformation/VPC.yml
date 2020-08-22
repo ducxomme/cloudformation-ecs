@@ -10,7 +10,7 @@ Parameters:
   
   ApplicationName:
     Type: String
-    Default: httpd
+    Default: wordpress
   
   VPCCIDR:
     Type: String
