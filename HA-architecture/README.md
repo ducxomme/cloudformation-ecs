@@ -1,3 +1,5 @@
+![Architecture](./architecture.drawio.svg)
+
 **Create DB Cluster Parameter Group and DB Parameter Group**
 ```shell
 aws cloudformation create-stack --stack-name wordpress-parameter-group \
